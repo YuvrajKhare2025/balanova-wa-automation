@@ -136,13 +136,36 @@ img, svg { display: block; }
 .brand-mark .icon { width: 20px; height: 20px; }
 .brand-mark img { width: 100% !important; height: 100% !important; object-fit: contain !important; display: block !important; }
 
-/* Global Logo Safety — prevents any logo image from ever expanding */
-.brand img,
-.footer-brand img,
-.admin-topbar .brand img,
-.logo img,
-.logo-icon img,
+/* Global Brand Mark & Logo Safety */
+.brand-mark {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    max-width: 38px !important;
+    max-height: 38px !important;
+    border-radius: 10px !important;
+    background: #ffffff !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18) !important;
+    box-sizing: border-box !important;
+    padding: 3px !important;
+    flex-shrink: 0 !important;
+}
 .brand-mark img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+    object-fit: contain !important;
+    display: block !important;
+}
+.brand > img,
+.footer-brand > img,
+.admin-topbar .brand > img {
     height: 34px !important;
     max-height: 34px !important;
     width: auto !important;
