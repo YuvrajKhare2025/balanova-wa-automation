@@ -265,6 +265,21 @@ h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.015em; }
     display: block !important;
 }
 
+/* Global Logo Safety — prevents any logo image from ever expanding */
+.brand img,
+.footer-brand img,
+.admin-topbar .brand img,
+.logo img,
+.logo-icon img,
+.brand-mark img {
+    height: 34px !important;
+    max-height: 34px !important;
+    width: auto !important;
+    max-width: 160px !important;
+    object-fit: contain !important;
+    display: block !important;
+}
+
 .logo-text { display: flex; flex-direction: column; min-width: 0; }
 
 .logo-title {

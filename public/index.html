@@ -9,7 +9,7 @@
         content="Manage your WhatsApp Business automation — chatbot rules, contacts, scheduled messages and analytics.">
     <meta name="theme-color" content="#0D4530">
     <link rel="icon" type="image/png" href="/img/logo-icon.png">
-    <link rel="stylesheet" href="css/style.css?v=20261119_v2">
+    <link rel="stylesheet" href="css/style.css?v=20261119_v4">
 </head>
 
 <body>
@@ -20,10 +20,13 @@
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="logo" style="display:flex;align-items:center;justify-content:space-between;width:100%">
-                <div style="background:#fff;padding:4px 10px;border-radius:8px;display:flex;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,0.18)">
-                    <img src="/img/logo.png" alt="Versa Nova AI" style="height:34px;width:auto;max-width:160px;object-fit:contain;display:block">
+                <div
+                    style="background:#fff;padding:4px 10px;border-radius:8px;display:flex;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,0.18)">
+                    <img src="/img/logo.png" alt="Versa Nova AI"
+                        style="height:34px;width:auto;max-width:160px;object-fit:contain;display:block">
                 </div>
-                <span class="logo-subtitle" id="modeIndicator" style="font-size:0.75rem;background:rgba(34,197,94,0.15);color:#4ade80;padding:2px 8px;border-radius:12px;font-weight:700">Live</span>
+                <span class="logo-subtitle" id="modeIndicator"
+                    style="font-size:0.75rem;background:rgba(34,197,94,0.15);color:#4ade80;padding:2px 8px;border-radius:12px;font-weight:700">Live</span>
             </div>
         </div>
 
@@ -100,7 +103,8 @@
             aria-controls="sidebar">
             <span></span><span></span><span></span>
         </button>
-        <span class="mobile-title" style="display:flex;align-items:center"><img src="/img/logo.png" alt="Versa Nova AI" style="height:26px;width:auto;background:#fff;padding:2px 8px;border-radius:4px;object-fit:contain"></span>
+        <span class="mobile-title" style="display:flex;align-items:center"><img src="/img/logo.png" alt="Versa Nova AI"
+                style="height:26px;width:auto;background:#fff;padding:2px 8px;border-radius:4px;object-fit:contain"></span>
     </header>
 
     <div class="overlay" id="overlay" role="presentation"></div>
@@ -1331,12 +1335,14 @@
                         <p class="card-note">Connect your Google Calendar to log every outreach send as an event,
                             schedule WhatsApp messages by creating an event titled
                             <code>WhatsApp: &lt;phone number&gt;</code> with the message in the description, and
-                            optionally skip sends while your calendar shows you're busy.</p>
+                            optionally skip sends while your calendar shows you're busy.
+                        </p>
                         <div id="calendarNotConfigured" style="display:none">
                             <p style="color:var(--color-text-secondary)">Google Calendar isn't set up on this server
                                 yet. An administrator needs to add <code>GOOGLE_CALENDAR_CLIENT_ID</code>,
                                 <code>GOOGLE_CALENDAR_CLIENT_SECRET</code> and <code>GOOGLE_CALENDAR_REDIRECT_URI</code>
-                                to the server's environment.</p>
+                                to the server's environment.
+                            </p>
                         </div>
                         <div id="calendarStatus" aria-live="polite">
                             <p>Checking connection…</p>
