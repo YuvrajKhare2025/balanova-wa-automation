@@ -96,7 +96,7 @@ async function saveSettings(userId, input) {
 }
 
 /** Every working-hours slot start/end (as UTC Date objects) over the next `daysAhead` days, before any busy/booked filtering. */
-function generateCandidateSlots(settings, { daysAhead = DEFAULT_DAYS_AHEAD, now = new Date() } = {}) {
+function generateCandidateSlots(settings, { startDate = null, daysAhead = DEFAULT_DAYS_AHEAD, now = new Date() } = {}) {
     const [startH, startM] = settings.startTime.split(':').map(Number);
     const [endH, endM] = settings.endTime.split(':').map(Number);
     const dayStartMin = startH * 60 + startM;
@@ -104,15 +104,35 @@ function generateCandidateSlots(settings, { daysAhead = DEFAULT_DAYS_AHEAD, now 
     const stepMin = settings.slotDurationMinutes + settings.bufferMinutes;
     const earliestStart = new Date(now.getTime() + MIN_LEAD_MINUTES * 60000);
 
-    // Anchor on "today" in the business's own timezone, not the server's.
+    // Anchor on "today" in the business's own timezone, or on requested startDate
     const nowParts = utcToZonedParts(now, settings.timezone);
+    let anchorYear = nowParts.year;
+    let anchorMonth = nowParts.month;
+    let anchorDay = nowParts.day;
+
+    if (startDate) {
+        if (typeof startDate === 'string') {
+            const m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(startDate.trim());
+            if (m) {
+                anchorYear = parseInt(m[1], 10);
+                anchorMonth = parseInt(m[2], 10);
+                anchorDay = parseInt(m[3], 10);
+            }
+        } else if (startDate instanceof Date && !isNaN(startDate.getTime())) {
+            const sp = utcToZonedParts(startDate, settings.timezone);
+            anchorYear = sp.year;
+            anchorMonth = sp.month;
+            anchorDay = sp.day;
+        }
+    }
+
     const slots = [];
 
     for (let d = 0; d <= daysAhead; d++) {
         // Walk the date forward by constructing UTC-noon-of-that-day-plus-d
         // and re-reading its zoned Y/M/D — avoids any local-clock DST edge
         // cases the naive "add 24h" approach can hit.
-        const dayAnchor = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day + d, 12, 0, 0));
+        const dayAnchor = new Date(Date.UTC(anchorYear, anchorMonth - 1, anchorDay + d, 12, 0, 0));
         const dayParts = utcToZonedParts(dayAnchor, settings.timezone);
 
         if (!settings.workingDays.includes(dayParts.weekday)) continue;
@@ -137,11 +157,15 @@ function rangesOverlap(aStart, aEnd, bStart, bEnd) {
  * Live, bookable slots for the next `daysAhead` days: working hours minus
  * whatever's already booked internally and (best-effort) busy on Google
  * Calendar.
+ * Supports startDate (string YYYY-MM-DD or Date object) to query slots on a specific date.
  */
-async function getAvailableSlots(userId, { daysAhead = DEFAULT_DAYS_AHEAD, maxResults = DEFAULT_MAX_RESULTS } = {}) {
-    const days = Math.min(Math.max(1, Number(daysAhead) || DEFAULT_DAYS_AHEAD), MAX_DAYS_AHEAD);
+async function getAvailableSlots(userId, { startDate = null, daysAhead, maxResults } = {}) {
+    const defaultDays = startDate ? 1 : DEFAULT_DAYS_AHEAD;
+    const days = Math.min(Math.max(0, Number.isFinite(daysAhead) ? Number(daysAhead) : defaultDays), MAX_DAYS_AHEAD);
+    const limit = Math.min(Math.max(1, Number(maxResults) || (startDate ? 16 : DEFAULT_MAX_RESULTS)), 50);
+
     const settings = await getSettings(userId);
-    const candidates = generateCandidateSlots(settings, { daysAhead: days });
+    const candidates = generateCandidateSlots(settings, { startDate, daysAhead: days });
     if (candidates.length === 0) return { settings, slots: [] };
 
     const rangeStart = candidates[0].startUtc;
@@ -167,7 +191,7 @@ async function getAvailableSlots(userId, { daysAhead = DEFAULT_DAYS_AHEAD, maxRe
 
     return {
         settings,
-        slots: free.slice(0, maxResults).map(s => ({
+        slots: free.slice(0, limit).map(s => ({
             startIso: s.startUtc.toISOString(),
             endIso: s.endUtc.toISOString(),
             label: formatInZone(s.startUtc, settings.timezone)

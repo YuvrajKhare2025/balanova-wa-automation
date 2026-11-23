@@ -49,9 +49,11 @@ router.put('/settings', writeLimiter, requireDurableWrite, asyncHandler(async (r
 
 // ─── Slot preview (dashboard + manual booking form) ────────────
 router.get('/slots', asyncHandler(async (req, res) => {
+    const startDate = (req.query.date || req.query.startDate || '').trim() || undefined;
     const daysAhead = req.query.daysAhead ? parseInt(req.query.daysAhead, 10) : undefined;
     const maxResults = req.query.maxResults ? parseInt(req.query.maxResults, 10) : undefined;
     const data = await getAvailableSlots(req.user.id, {
+        startDate,
         daysAhead: Number.isFinite(daysAhead) ? daysAhead : undefined,
         maxResults: Number.isFinite(maxResults) ? maxResults : undefined
     });
