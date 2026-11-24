@@ -95,6 +95,79 @@ async function saveSettings(userId, input) {
     return await getSettings(userId);
 }
 
+/** Parses any date string (ISO, text like "26 Nov", "tomorrow", "Friday") into zoned year, month, day. */
+function parseDateInput(input, timezone = 'Asia/Kolkata', now = new Date()) {
+    if (!input) return null;
+    const nowParts = utcToZonedParts(now, timezone);
+    const str = String(input).trim().toLowerCase();
+
+    // 1. Relative keywords
+    if (str === 'today') {
+        return { year: nowParts.year, month: nowParts.month, day: nowParts.day };
+    }
+    if (str === 'tomorrow') {
+        const d = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day + 1, 12, 0, 0));
+        const p = utcToZonedParts(d, timezone);
+        return { year: p.year, month: p.month, day: p.day };
+    }
+    if (str.includes('day after tomorrow') || str === 'overmorrow') {
+        const d = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day + 2, 12, 0, 0));
+        const p = utcToZonedParts(d, timezone);
+        return { year: p.year, month: p.month, day: p.day };
+    }
+
+    // 2. Day of week (e.g. 'friday', 'coming friday', 'next monday')
+    const dayMap = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6,
+                     sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+    for (const [dayName, dayNum] of Object.entries(dayMap)) {
+        if (new RegExp('\\b' + dayName + '\\b').test(str)) {
+            let diff = dayNum - nowParts.weekday;
+            if (diff <= 0) diff += 7; // next occurrence
+            const d = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day + diff, 12, 0, 0));
+            const p = utcToZonedParts(d, timezone);
+            return { year: p.year, month: p.month, day: p.day };
+        }
+    }
+
+    // 3. ISO YYYY-MM-DD or YYYY/MM/DD
+    let m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(str);
+    if (m) {
+        return { year: parseInt(m[1], 10), month: parseInt(m[2], 10), day: parseInt(m[3], 10) };
+    }
+
+    // 4. DD-MM-YYYY or DD/MM/YYYY
+    m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/.exec(str);
+    if (m) {
+        return { year: parseInt(m[3], 10), month: parseInt(m[2], 10), day: parseInt(m[1], 10) };
+    }
+
+    // 5. English Month strings (e.g. '26 november', '26th nov', 'nov 26', '26 nov 2026')
+    const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const shortMonths = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    for (let mi = 0; mi < 12; mi++) {
+        const full = months[mi];
+        const sh = shortMonths[mi];
+        if (str.includes(full) || str.includes(sh)) {
+            const dayMatch = str.match(/\b(\d{1,2})(?:st|nd|rd|th)?\b/);
+            const yearMatch = str.match(/\b(20\d{2})\b/);
+            if (dayMatch) {
+                const day = parseInt(dayMatch[1], 10);
+                const year = yearMatch ? parseInt(yearMatch[1], 10) : nowParts.year;
+                return { year, month: mi + 1, day };
+            }
+        }
+    }
+
+    // 6. Native Date fallback
+    const parsed = new Date(input);
+    if (!isNaN(parsed.getTime())) {
+        const p = utcToZonedParts(parsed, timezone);
+        return { year: p.year, month: p.month, day: p.day };
+    }
+
+    return null;
+}
+
 /** Every working-hours slot start/end (as UTC Date objects) over the next `daysAhead` days, before any busy/booked filtering. */
 function generateCandidateSlots(settings, { startDate = null, daysAhead = DEFAULT_DAYS_AHEAD, now = new Date() } = {}) {
     const [startH, startM] = settings.startTime.split(':').map(Number);
@@ -111,18 +184,11 @@ function generateCandidateSlots(settings, { startDate = null, daysAhead = DEFAUL
     let anchorDay = nowParts.day;
 
     if (startDate) {
-        if (typeof startDate === 'string') {
-            const m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(startDate.trim());
-            if (m) {
-                anchorYear = parseInt(m[1], 10);
-                anchorMonth = parseInt(m[2], 10);
-                anchorDay = parseInt(m[3], 10);
-            }
-        } else if (startDate instanceof Date && !isNaN(startDate.getTime())) {
-            const sp = utcToZonedParts(startDate, settings.timezone);
-            anchorYear = sp.year;
-            anchorMonth = sp.month;
-            anchorDay = sp.day;
+        const parsed = parseDateInput(startDate, settings.timezone, now);
+        if (parsed) {
+            anchorYear = parsed.year;
+            anchorMonth = parsed.month;
+            anchorDay = parsed.day;
         }
     }
 
@@ -303,5 +369,6 @@ module.exports = {
     saveSettings,
     getAvailableSlots,
     bookAppointment,
-    cancelAppointment
+    cancelAppointment,
+    parseDateInput
 };

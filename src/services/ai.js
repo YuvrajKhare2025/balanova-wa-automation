@@ -25,7 +25,7 @@ const { callGeminiWithRetry, extractText } = require('./gemini-client');
 const { createPartFromFunctionCall, createPartFromFunctionResponse } = require('@google/genai');
 const { getSetting, getProductById, getProducts } = require('./database');
 const { getBusinessContext } = require('./business');
-const { getSettings: getAvailabilitySettings, getAvailableSlots, bookAppointment } = require('./availability');
+const { getSettings: getAvailabilitySettings, getAvailableSlots, bookAppointment, parseDateInput } = require('./availability');
 const { utcToZonedParts, isValidTimeZone } = require('../utils/tz');
 
 // Bounds on what goes into a prompt. Tokens cost money and latency, and an
@@ -197,7 +197,7 @@ function buildTools({ bookingEnabled, hasProducts }) {
 
 const MAX_TOOL_ROUNDS = 3;
 
-async function generateReplyWithTools({ userId, phone, contactName, systemInstruction, contents, tools }) {
+async function generateReplyWithTools({ userId, phone, contactName, systemInstruction, contents, tools, lastUserMsg = '', timezone = 'Asia/Kolkata' }) {
     const callModel = () => callGeminiWithRetry(
         userId,
         (client, model) => client.models.generateContent({
@@ -221,7 +221,14 @@ async function generateReplyWithTools({ userId, phone, contactName, systemInstru
         let result;
         try {
             if (call.name === 'check_availability') {
-                const targetDate = call.args && typeof call.args.date === 'string' && call.args.date.trim() ? call.args.date.trim() : null;
+                let targetDate = call.args && typeof call.args.date === 'string' && call.args.date.trim() ? call.args.date.trim() : null;
+                // Fallback: If Gemini did not supply date, resolve date automatically from user's message
+                if (!targetDate && lastUserMsg) {
+                    const parsed = parseDateInput(lastUserMsg, timezone);
+                    if (parsed) {
+                        targetDate = `${parsed.year}-${String(parsed.month).padStart(2, '0')}-${String(parsed.day).padStart(2, '0')}`;
+                    }
+                }
                 const daysAhead = Math.min(Math.max(parseInt(call.args && call.args.daysAhead, 10) || (targetDate ? 2 : 7), 1), 14);
                 const { slots } = await getAvailableSlots(userId, { startDate: targetDate, daysAhead, maxResults: 16 });
                 result = slots.length
@@ -369,10 +376,15 @@ async function generateReply(userId, systemPrompt, conversationHistory, contactN
     while (contents.length && contents[contents.length - 1].role !== 'user') contents.pop();
     if (contents.length === 0) contents.push({ role: 'user', parts: [{ text: 'Hi' }] });
 
+    const lastUserMsg = (conversationHistory && conversationHistory.length)
+        ? String(conversationHistory[conversationHistory.length - 1].body || '').trim()
+        : '';
+
     let reply;
     if (tools) {
         reply = await generateReplyWithTools({
-            userId, phone, contactName, systemInstruction, contents, tools
+            userId, phone, contactName, systemInstruction, contents, tools,
+            lastUserMsg, timezone: availSettings.timezone
         });
     } else {
         const response = await callGeminiWithRetry(

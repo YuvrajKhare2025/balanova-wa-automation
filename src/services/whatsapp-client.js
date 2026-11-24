@@ -445,8 +445,8 @@ async function initWhatsAppClient(userId) {
                     '--disable-gpu',
                     '--disable-extensions',
                     // ── Memory-saving flags for low-RAM servers ──────────────
-                    // Limit V8 heap to 256MB per renderer (default can be 512MB+)
-                    '--js-flags=--max-old-space-size=256',
+                    // Limit V8 heap to 512MB per renderer to prevent OOM crashes on heavy WhatsApp Web chats
+                    '--js-flags=--max-old-space-size=512',
                     // Disable features that use background RAM even when idle
                     '--disable-background-timer-throttling',
                     '--disable-backgrounding-occluded-windows',
@@ -538,9 +538,9 @@ function attachHandlers(userId, s, client) {
             try {
                 const state = await Promise.race([
                     client.getState(),
-                    new Promise((_, rej) => setTimeout(() => rej(new Error('getState timeout')), 5000))
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('getState timeout')), 15000))
                 ]);
-                if (state !== 'CONNECTED') {
+                if (state && state !== 'CONNECTED' && state !== 'PAIRING' && state !== 'OPENING') {
                     console.warn(`⚠️ [user ${userId}] WhatsApp state is`, state, '— scheduling reconnect.');
                     scheduleRestart(userId, 5000);
                 }
@@ -549,9 +549,9 @@ function attachHandlers(userId, s, client) {
                 const isTransient = msg.includes('Execution context') || msg.includes('Target closed') || msg.includes('timeout');
                 if (isTransient) {
                     s.transientKeepAliveFailures = (s.transientKeepAliveFailures || 0) + 1;
-                    if (s.transientKeepAliveFailures >= 3) {
+                    if (s.transientKeepAliveFailures >= 4) {
                         s.transientKeepAliveFailures = 0;
-                        console.warn(`⚠️ [user ${userId}] Keep-alive failed 3× in a row — reconnecting.`);
+                        console.warn(`⚠️ [user ${userId}] Keep-alive failed 4× in a row — reconnecting.`);
                         scheduleRestart(userId, 5000);
                     }
                 } else {
@@ -773,18 +773,19 @@ function addSSEClient(userId, req, res) {
         send({ type: 'qr', data: s.currentQR });
     } else if (s.userDisconnected) {
         send({ type: 'disconnected' });
-    } else {
+    } else if (s.lastError) {
+        send({ type: 'error', data: s.lastError });
+    } else if (s.isInitializing) {
         send({ type: 'loading' });
-        // Covers two cases:
-        //   1. Nothing started yet (first visit after signup)
-        //   2. Session was hibernated — silently revive Chrome without a new QR.
-        if (!s.isInitializing && !s.client) {
-            initWhatsAppClient(userId).then(result => {
-                if (result && result.accepted === false) send({ type: 'error', data: result.reason });
-            }).catch(e => {
-                send({ type: 'error', data: e.message });
-            });
-        }
+    } else if (!s.client) {
+        send({ type: 'loading' });
+        initWhatsAppClient(userId).then(result => {
+            if (result && result.accepted === false) send({ type: 'error', data: result.reason });
+        }).catch(e => {
+            send({ type: 'error', data: e.message });
+        });
+    } else {
+        send({ type: 'disconnected' });
     }
 
 client.heartbeat = setInterval(() => {
@@ -827,7 +828,7 @@ function getClient(userId) {
 
 function getStatus(userId) {
     const s = getSession(Number(userId), false);
-    if (!s) return { connected: false, phone: null, started: false, error: null, qr: null, hibernated: false };
+    if (!s) return { connected: false, phone: null, started: false, error: null, qr: null, hibernated: false, disconnected: true };
     return {
         connected: s.isConnected,
         phone: s.isConnected && s.client?.info ? s.client.info.wid.user : null,
@@ -837,7 +838,8 @@ function getStatus(userId) {
         error: s.lastError || null,
         // Expose QR data URL so the frontend can fetch it via REST polling
         // when the SSE stream is blocked by a cloud load balancer / proxy.
-        qr: s.currentQR || null
+        qr: s.currentQR || null,
+        disconnected: !s.isConnected && !s.isInitializing && !s.currentQR
     };
 }
 

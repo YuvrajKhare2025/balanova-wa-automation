@@ -2597,6 +2597,8 @@ function startStatusPolling() {
                 applyConnectionState({ type: 'error', data: s.error });
             } else if (s.initializing) {
                 applyConnectionState({ type: 'loading' });
+            } else {
+                applyConnectionState({ type: 'disconnected' });
             }
         } catch (e) {
             // API unreachable — keep polling silently
@@ -2653,21 +2655,27 @@ function applyConnectionState(data) {
             reconnectDiv.style.padding = '24px 16px';
 
             // Only show connect button if admin has granted WA access to this user
-            const waAllowed = CURRENT_USER && (CURRENT_USER.role === 'admin' || CURRENT_USER.wa_enabled);
+            const waAllowed = !CURRENT_USER || CURRENT_USER.role === 'admin' || CURRENT_USER.wa_enabled === 1 || CURRENT_USER.wa_enabled === true || CURRENT_USER.wa_enabled === '1' || CURRENT_USER.wa_enabled;
 
             if (waAllowed) {
                 reconnectDiv.innerHTML = `
                     <p style="color:var(--color-error);font-weight:600;margin-bottom:12px;">${Icon('x-circle', 'icon-inline')} WhatsApp is Disconnected</p>
+                    <p style="color:var(--color-text-secondary);font-size:0.88rem;margin-bottom:14px;">Click below to initialize WhatsApp and generate a fresh QR code.</p>
                     <button class="btn btn-primary btn-sm" id="reconnectWaBtn" type="button" style="display:inline-flex;align-items:center;gap:6px;">${Icon('refresh-cw', 'icon-inline')} Connect &amp; Show QR Code</button>
                 `;
                 qrContainer.appendChild(reconnectDiv);
                 document.getElementById('reconnectWaBtn')?.addEventListener('click', async () => {
-                    reconnectDiv.innerHTML = `<div class="qr-loading">${Icon('loader', 'icon-inline')} Starting WhatsApp Client…</div>`;
+                    reconnectDiv.innerHTML = `<div class="qr-loading">${Icon('loader', 'icon-inline')} Starting WhatsApp Client… (QR code will appear shortly)</div>`;
                     try {
                         await api('/api/whatsapp/connect', { method: 'POST' });
+                        startStatusPolling();
                         applyConnectionState({ type: 'loading' });
                     } catch (e) {
                         showToast(e.message || 'Failed to start connection', 'error');
+                        reconnectDiv.innerHTML = `
+                            <p style="color:var(--color-error);font-weight:600;margin-bottom:12px;">${Icon('x-circle', 'icon-inline')} ${escapeHtml(e.message || 'Failed to start connection')}</p>
+                            <button class="btn btn-primary btn-sm" id="reconnectWaBtn" type="button" style="display:inline-flex;align-items:center;gap:6px;">${Icon('refresh-cw', 'icon-inline')} Try Connecting Again</button>
+                        `;
                     }
                 });
             } else {
@@ -2891,6 +2899,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             navigateTo(item.dataset.section);
         });
     });
+
+    // ── Sidebar Connection Status Click ────────────────────
+    const connStatusEl = document.getElementById('connectionStatus');
+    if (connStatusEl) {
+        connStatusEl.style.cursor = 'pointer';
+        connStatusEl.setAttribute('title', 'Click to manage WhatsApp connection & scan QR');
+        connStatusEl.addEventListener('click', () => {
+            navigateTo('settings');
+            const qrTabBtn = document.querySelector('.settings-tab-btn[data-tab="qr"]');
+            if (qrTabBtn) qrTabBtn.click();
+            const reconnectBtn = document.getElementById('reconnectWaBtn');
+            if (reconnectBtn) reconnectBtn.click();
+        });
+    }
 
     // ── Mobile menu ─────────────────────────────────────────
     const menuToggle = document.getElementById('menuToggle');
