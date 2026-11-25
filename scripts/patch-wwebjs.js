@@ -57,38 +57,17 @@ function patchWWebJS() {
         let clientContent = fs.readFileSync(clientPath, 'utf8');
         let clientModified = false;
 
-        if (!clientContent.includes('/* PATCH_WWEBJS_SOCKET_NULL_FIX */')) {
-            // Target the block where Socket = window.require('WAWebSocketModel').Socket; is assigned
-            const socketAssignRegex = /Socket\s*=\s*window\.require\(\s*['"]WAWebSocketModel['"]\s*\)\.Socket;/;
-            if (socketAssignRegex.test(clientContent)) {
-                clientContent = clientContent.replace(
-                    socketAssignRegex,
-                    `/* PATCH_WWEBJS_SOCKET_NULL_FIX */\n                    const _wsModel = (typeof window.require === 'function') ? window.require('WAWebSocketModel') : null;\n                    Socket = _wsModel ? _wsModel.Socket : null;\n                    if (!Socket) {\n                        try {\n                            const _bus = (typeof window.require === 'function') ? window.require('WAWebBackendEventBus') : null;\n                            if (_bus && _bus.BackendEventBus) {\n                                Socket = _bus.BackendEventBus;\n                                Socket.hasSynced = Socket.isMainStreamReadyMd;\n                            }\n                        } catch (_) {}\n                    }`
-                );
+        if (!clientContent.includes('/* PATCH_WWEBJS_SOCKET_NULL_FIX_V2 */')) {
+            // Replace any single-line or multi-line WAWebSocketModel.Socket access with a bulletproof safe fallback
+            const socketRegex = /(?:window\s*\.)?require\(\s*['"]WAWebSocketModel['"]\s*\)[\r\n\s]*\.Socket/g;
+            const safeSocket = `/* PATCH_WWEBJS_SOCKET_NULL_FIX_V2 */ (window.require?.('WAWebSocketModel')?.Socket || { on: () => {}, off: () => {}, state: 'UNPAIRED', streamState: 'DISCONNECTED', takeover: () => {}, logout: () => {} })`;
+
+            if (socketRegex.test(clientContent)) {
+                clientContent = clientContent.replace(socketRegex, safeSocket);
                 clientModified = true;
             }
 
-            // Safe listener attach so if Socket is still null on initial landing, it won't crash
-            const listenerPushRegex = /(listeners\.push\(\[\s*Socket,\s*['"]change:state['"])/;
-            if (listenerPushRegex.test(clientContent)) {
-                clientContent = clientContent.replace(
-                    listenerPushRegex,
-                    `if (Socket) $1`
-                );
-                clientModified = true;
-            }
-
-            // Safe takeover
-            const takeoverRegex = /window\s*\.require\(\s*['"]WAWebSocketModel['"]\s*\)\s*\.Socket\.takeover\(\)/g;
-            if (takeoverRegex.test(clientContent)) {
-                clientContent = clientContent.replace(
-                    takeoverRegex,
-                    `(() => { try { const m = typeof window.require === 'function' ? window.require('WAWebSocketModel') : null; if (m && m.Socket && typeof m.Socket.takeover === 'function') m.Socket.takeover(); } catch(_) {} })()`
-                );
-                clientModified = true;
-            }
-
-            // Safe AppState in ready evaluation
+            // Also ensure AppState fallback if present
             const appStateRegex = /const\s+AppState\s*=\s*window\.require\(\s*['"]WAWebSocketModel['"]\s*\)\.Socket;/g;
             if (appStateRegex.test(clientContent)) {
                 clientContent = clientContent.replace(
@@ -101,7 +80,7 @@ function patchWWebJS() {
 
         if (clientModified) {
             fs.writeFileSync(clientPath, clientContent, 'utf8');
-            console.log('✅ [patch-wwebjs] Successfully applied Socket null hotfixes to Client.js!');
+            console.log('✅ [patch-wwebjs] Successfully applied bulletproof Socket null hotfixes to Client.js!');
             anyModified = true;
         }
     }

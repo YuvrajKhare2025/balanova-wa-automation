@@ -426,7 +426,9 @@ async function initWhatsAppClient(userId) {
             // web.whatsapp.com only when nothing cached matches — no GitHub
             // dependency, no stale pin.
             webVersionCache: {
-                type: 'none'
+                type: 'remote',
+                remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html',
+                strict: false
             },
             puppeteer: {
                 headless: 'new',
