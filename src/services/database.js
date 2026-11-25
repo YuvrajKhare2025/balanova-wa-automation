@@ -133,6 +133,9 @@ async function initDatabase() {
     // Provision bootstrap admin if configured
     await ensureBootstrapAdmin();
 
+    // Ensure all active accounts have WhatsApp access enabled
+    await query("UPDATE users SET wa_enabled = 1 WHERE wa_enabled = 0 OR wa_enabled IS NULL").catch(() => {});
+
     return getPool();
 }
 
@@ -225,7 +228,7 @@ async function createUser(arg1, maybePasswordHash, maybeRole, maybeStatus) {
             plan = 'free',
             messageLimit = 0,
             ruleLimit = 0,
-            waEnabled = 0
+            waEnabled = 1
         } = arg1);
     } else {
         email = arg1;
@@ -237,7 +240,7 @@ async function createUser(arg1, maybePasswordHash, maybeRole, maybeStatus) {
         plan = 'free';
         messageLimit = 0;
         ruleLimit = 0;
-        waEnabled = 0;
+        waEnabled = 1;
     }
 
     return transaction(async (tx) => {

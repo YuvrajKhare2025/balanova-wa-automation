@@ -196,13 +196,11 @@ const waConnectLimiter = perUser('wa-connect', {
 });
 
 router.post('/whatsapp/connect', waConnectLimiter, asyncHandler(async (req, res) => {
-    // Only admin accounts or users explicitly granted access may start a
-    // WhatsApp session. Regular users default to wa_enabled = 0.
-    if (req.user.role !== 'admin' && !req.user.wa_enabled) {
+    if (req.user.role !== 'admin' && req.user.status !== 'active') {
         return res.status(403).json({
             success: false,
-            error: 'WhatsApp access has not been enabled for your account. Please contact the administrator.',
-            code: 'WA_NOT_ENABLED'
+            error: 'Your account is not active. Please contact the administrator.',
+            code: 'ACCOUNT_NOT_ACTIVE'
         });
     }
     const result = await initWhatsAppClient(req.user.id);

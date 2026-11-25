@@ -99,7 +99,7 @@ router.post('/users/:id/approve', asyncHandler(async (req, res) => {
     const target = await getUserById(id);
     if (!target) return res.status(404).json({ success: false, error: 'User not found' });
 
-    const updated = await updateUser(id, { status: 'active' });
+    const updated = await updateUser(id, { status: 'active', wa_enabled: 1 });
     res.json({ success: true, data: publicUser(updated) });
 }));
 

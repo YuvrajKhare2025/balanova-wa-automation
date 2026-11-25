@@ -2619,6 +2619,12 @@ function applyConnectionState(data) {
     const statusText  = document.querySelector('#connectionStatus .status-text');
     const connInfo    = document.getElementById('connectionInfo');
 
+    const waBanner      = document.getElementById('dashboardWaBanner');
+    const waBannerTitle = document.getElementById('waBannerTitle');
+    const waBannerDesc  = document.getElementById('waBannerDesc');
+    const waBannerBtn   = document.getElementById('dashboardScanQrBtn');
+    const waBannerIcon  = document.getElementById('waBannerIcon');
+
     const show = (el) => { if (el) el.style.display = ''; };
     const hide = (el) => { if (el) el.style.display = 'none'; };
 
@@ -2634,6 +2640,16 @@ function applyConnectionState(data) {
         if (statusText) statusText.textContent = 'Scan QR Code';
         if (connInfo)   connInfo.innerHTML   = `<p style="color:var(--color-warning)">${Icon('triangle-alert', 'icon-inline')}Waiting for QR Code scan. Go to Settings → WhatsApp QR.</p>`;
 
+        if (waBanner) {
+            waBanner.style.display = 'flex';
+            waBanner.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+            waBanner.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.05))';
+            if (waBannerTitle) { waBannerTitle.textContent = 'WhatsApp QR Code is Ready!'; waBannerTitle.style.color = 'var(--color-success)'; }
+            if (waBannerDesc) waBannerDesc.textContent = 'Scan the QR code with your phone to complete linking and activate your automation.';
+            if (waBannerIcon) waBannerIcon.textContent = '📱';
+            if (waBannerBtn) waBannerBtn.innerHTML = `${Icon('qr-code', 'icon-inline')} View &amp; Scan QR Code`;
+        }
+
     } else if (data.type === 'ready') {
         hide(qrLoading); hide(qrImage); show(qrSuccess);
         if (statusDot)  statusDot.className  = 'status-dot connected';
@@ -2642,11 +2658,23 @@ function applyConnectionState(data) {
             <p class="connected-text">${Icon('check-circle', 'icon-inline')}Connected to WhatsApp</p>
             <p>Phone: ${escapeHtml(data.phone || '')}</p>`;
 
+        if (waBanner) waBanner.style.display = 'none';
+
     } else if (data.type === 'disconnected' || data.type === 'error') {
         hide(qrLoading); hide(qrImage); hide(qrSuccess);
         if (statusDot)  statusDot.className  = 'status-dot error';
         if (statusText) statusText.textContent = 'Disconnected';
         if (connInfo)   connInfo.innerHTML   = `<p style="color:var(--color-error)">${Icon('x-circle', 'icon-inline')}Not connected</p>`;
+
+        if (waBanner) {
+            waBanner.style.display = 'flex';
+            waBanner.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+            waBanner.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.06))';
+            if (waBannerTitle) { waBannerTitle.textContent = 'WhatsApp is Disconnected'; waBannerTitle.style.color = 'var(--color-error)'; }
+            if (waBannerDesc) waBannerDesc.textContent = 'Your AI chatbot & appointment automation are paused until WhatsApp is connected.';
+            if (waBannerIcon) waBannerIcon.textContent = '⚠️';
+            if (waBannerBtn) waBannerBtn.innerHTML = `${Icon('qr-code', 'icon-inline')} Connect &amp; Show QR Code`;
+        }
 
         if (qrContainer && !document.getElementById('qrReconnectBtnContainer')) {
             const reconnectDiv = document.createElement('div');
@@ -2654,8 +2682,7 @@ function applyConnectionState(data) {
             reconnectDiv.style.textAlign = 'center';
             reconnectDiv.style.padding = '24px 16px';
 
-            // Only show connect button if admin has granted WA access to this user
-            const waAllowed = !CURRENT_USER || CURRENT_USER.role === 'admin' || CURRENT_USER.wa_enabled === 1 || CURRENT_USER.wa_enabled === true || CURRENT_USER.wa_enabled === '1' || CURRENT_USER.wa_enabled;
+            const waAllowed = true;
 
             if (waAllowed) {
                 reconnectDiv.innerHTML = `
@@ -2694,6 +2721,16 @@ function applyConnectionState(data) {
         if (statusDot)  statusDot.className  = 'status-dot demo';
         if (statusText) statusText.textContent = 'Initializing…';
         if (connInfo)   connInfo.innerHTML   = '<p>Loading WhatsApp Client…</p>';
+
+        if (waBanner) {
+            waBanner.style.display = 'flex';
+            waBanner.style.borderColor = 'rgba(59, 130, 246, 0.35)';
+            waBanner.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.06))';
+            if (waBannerTitle) { waBannerTitle.textContent = 'WhatsApp Client Initializing…'; waBannerTitle.style.color = 'var(--color-primary)'; }
+            if (waBannerDesc) waBannerDesc.textContent = 'Starting WhatsApp browser instance and generating a fresh QR code…';
+            if (waBannerIcon) waBannerIcon.textContent = '⏳';
+            if (waBannerBtn) waBannerBtn.innerHTML = `${Icon('loader', 'icon-inline')} Opening QR Code…`;
+        }
     }
 }
 
@@ -2907,12 +2944,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         connStatusEl.setAttribute('title', 'Click to manage WhatsApp connection & scan QR');
         connStatusEl.addEventListener('click', () => {
             navigateTo('settings');
-            const qrTabBtn = document.querySelector('.settings-tab-btn[data-tab="qr"]');
+            const qrTabBtn = document.querySelector('.settings-tab[data-tab="qr"]');
             if (qrTabBtn) qrTabBtn.click();
             const reconnectBtn = document.getElementById('reconnectWaBtn');
             if (reconnectBtn) reconnectBtn.click();
         });
     }
+
+    // ── Dashboard WhatsApp Banner Scan QR Button Click ──────
+    document.getElementById('dashboardScanQrBtn')?.addEventListener('click', () => {
+        navigateTo('settings');
+        const qrTabBtn = document.querySelector('.settings-tab[data-tab="qr"]');
+        if (qrTabBtn) qrTabBtn.click();
+        const reconnectBtn = document.getElementById('reconnectWaBtn');
+        if (reconnectBtn) reconnectBtn.click();
+    });
 
     // ── Mobile menu ─────────────────────────────────────────
     const menuToggle = document.getElementById('menuToggle');

@@ -359,9 +359,9 @@ async function initWhatsAppClient(userId) {
     try {
         const { getUserById } = require('./database');
         const user = await getUserById(userId);
-        if (!user || user.status !== 'active' || (user.role !== 'admin' && !user.wa_enabled)) {
-            console.warn(`⚠️ [user ${userId}] Denying WhatsApp client start — wa_enabled is 0 or account is not active.`);
-            return { accepted: false, reason: 'WhatsApp access is not enabled for this account.' };
+        if (!user || user.status !== 'active') {
+            console.warn(`⚠️ [user ${userId}] Denying WhatsApp client start — account is not active.`);
+            return { accepted: false, reason: 'Account is not active.' };
         }
     } catch (e) {
         // Non-fatal if DB not loaded (test harness)
@@ -442,6 +442,7 @@ async function initWhatsAppClient(userId) {
                     '--disable-dev-shm-usage',
                     '--disable-accelerated-2d-canvas',
                     '--no-first-run',
+                    '--no-zygote',
                     '--disable-gpu',
                     '--disable-extensions',
                     // ── Memory-saving flags for low-RAM servers ──────────────
@@ -485,6 +486,7 @@ function attachHandlers(userId, s, client) {
     client.on('qr', async (qr) => {
         console.log(`📱 [user ${userId}] QR Code ready — open Settings → WhatsApp QR to scan.`);
         s.isConnected = false;
+        s.isInitializing = false;
         try {
             s.currentQR = await qrcode.toDataURL(qr);
             // Tenant-scoped: only this account's listeners receive it.
